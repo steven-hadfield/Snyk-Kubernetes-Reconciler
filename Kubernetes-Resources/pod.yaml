@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: snyk-reconciler
+  namespace: default
+spec:
+  serviceAccountName: snyk-reconciler
+  containers:
+  - name: snyk-reconciler
+    image: doll1av/k8sreconciler:0.3
+    imagePullPolicy: IfNotPresent
+  restartPolicy: Always
