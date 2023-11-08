@@ -7,6 +7,6 @@ spec:
   serviceAccountName: snyk-reconciler
   containers:
   - name: snyk-reconciler
-    image: doll1av/k8sreconciler:0.3
+    image: a1doll/k8sreconciler:0.4
     imagePullPolicy: IfNotPresent
   restartPolicy: Always

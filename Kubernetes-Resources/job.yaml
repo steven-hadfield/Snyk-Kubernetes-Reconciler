@@ -1,0 +1,16 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  creationTimestamp: null
+  name: snyk-reconciler
+spec:
+  template:
+    spec:
+      serviceAccountName: snyk-reconciler
+      containers:
+      - image: a1doll/k8sreconciler
+        name: snyk-reconciler
+        resources: {}
+        imagePullPolicy: Always
+      restartPolicy: Never
+status: {}
