@@ -6,6 +6,9 @@ import time
 import sys
 
 #Globals, probably worth changing these to environment variables or mounting them from a configmap
+APIKEY = 
+orgId = 
+snykAPIVersion = 
 
 
 #Scan any missing images, 'images' should be a iterable list
