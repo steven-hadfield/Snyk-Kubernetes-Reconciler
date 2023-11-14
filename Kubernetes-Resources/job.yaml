@@ -8,9 +8,16 @@ spec:
     spec:
       serviceAccountName: snyk-reconciler
       containers:
-      - image: a1doll/k8sreconciler
+      - image: a1doll/k8sreconciler:latest
         name: snyk-reconciler
         resources: {}
         imagePullPolicy: Always
+        env:
+        - name: APIKEY
+          value: "<SNYK_API_KEY>"
+        - name: ORGID
+          value: "<SNYK_ORGID"
+        - name: SNYKAPIVERSION
+          value: "<SNYK_REST_VERSION>"
       restartPolicy: Never
 status: {}
