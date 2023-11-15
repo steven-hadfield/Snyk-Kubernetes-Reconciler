@@ -32,7 +32,6 @@ def scanMissingImages(images):
 def deleteNonRunningTargets():
 
     #May be worth building in a retry mechanism instead of just failing
-    #Also the targets endpint only covers the case where there is no nextPage key, adding in 'while next page != empty' will probably be nessisary for larger datasets
     try:
         containerImageURL = "https://api.snyk.io/rest/orgs/{}/container_images?version={}&limit=100".format(ORGID, SNYKAPIVERSION)
         containerResponse = reqs.get(containerImageURL, headers={'Authorization': '{}'.format(APIKEY)})
@@ -56,11 +55,21 @@ def deleteNonRunningTargets():
 
         raise ex
 
+
+    #My cluster is small, the logic for this appears to be different from the above so idk if the while loop check works :(
     try:
         allTargetsUrl = "https://api.snyk.io/rest/orgs/{}/targets?version={}".format(ORGID, SNYKAPIVERSION)
         targetResponse = reqs.get(allTargetsUrl, headers={'Authorization': '{}'.format(APIKEY)})
         targetResponseJSON = targetResponse.json()
-        targetResponse.raise_for_status()        
+        targetResponse.raise_for_status()
+        fullListofTargets = list(targetResponseJSON['data'])
+
+        while(targetResponseJSON.get('data') != None and 'Next' in targetResponseJSON['links'] ):
+            targetResponse = reqs.get("https://api.snyk.io/{}&version={}".format(targetResponseJSON['links']['next'], SNYKAPIVERSION))
+            targetResponseJSON = containerResponse.json()
+            if targetResponseJSON.get('Data') != None:
+                fullListofTargets.append(containerResponseJSON['data'])
+
     except reqs.HTTPError as ex:
         print("ERROR: some error occured dumping target JSON {}".format(targetResponseJSON))
         print("If this error looks abnormal please check https://status.snyk.io/ for any incidents")
@@ -93,9 +102,6 @@ def deleteNonRunningTargets():
                             print("succesfully delete targetID {}, based off image {}".format(target['id'], imageTagStripped))
                         else:
                             print("Some issue deleting targetID {}, based off image {}. Response code: {}".format(target['id'], imageTagStripped, deleteResp.status_code))
-
-
-
 
 
 
@@ -146,7 +152,7 @@ for pod in v1.list_pod_for_all_namespaces().items:
         #The None only works if the image has NEVER been scanned, after it has been scanned it we keep some data around
         #if responseJSON.get('data') == None:
         if responseJSON.get('data') == None or 'self' not in responseJSON['data'][0]['relationships']['image_target_refs']['links']:
-            
+           
             #Cant imagine customers want to be charged a license because they run this
             if 'a1doll/k8sreconciler' not in image:
                 needsToBeScanned.append(image)
