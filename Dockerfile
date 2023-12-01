@@ -6,8 +6,7 @@ WORKDIR /usr/app/sec
 
 COPY . ./
 
-<<<<<<< Updated upstream
-=======
+
 RUN install -m 0755 -d /etc/apt/keyrings
 RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 RUN chmod a+r /etc/apt/keyrings/docker.gpg
@@ -26,7 +25,6 @@ RUN usermod -aG docker root
 RUN service docker restart
 RUN service docker start
 
->>>>>>> Stashed changes
 RUN pip install --no-cache-dir --upgrade pip && \ 
     pip install --no-cache-dir requests kubernetes
 RUN apk update && apk add --no-cache docker-cli

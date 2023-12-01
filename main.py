@@ -4,10 +4,7 @@ import json
 import os
 import time 
 import sys
-<<<<<<< Updated upstream
-=======
 #import time
->>>>>>> Stashed changes
 
 #Globals, probably worth adding in some sort of direct failure here if these are not set
 APIKEY = os.getenv("APIKEY")
@@ -27,12 +24,6 @@ def scanMissingImages(images):
     
     for missingImage in images:
 
-<<<<<<< Updated upstream
-        #projectName = missingImage.replace(":", "_")
-        #cmd = '/usr/app/sec/snyk container monitor {} --org={} --tags=kubernetes=monitored'.format(missingImage, orgId)
-        print("Scanning {}".format(missingImage))
-        cmd = '/usr/local/bin/snyk container monitor {} --org={} --tags=kubernetes=monitored '.format(missingImage, ORGID)
-=======
         #tag = missingImage.split(":")
         #tag = tag[1]
         #modifiedImage = missingImage.replace(':', '_')
@@ -56,7 +47,6 @@ def scanMissingImages(images):
             cmd = '/usr/local/bin/snyk container monitor {} --org={} --tags=kubernetes=monitored'.format(missingImage, ORGID)
 
         #cmd = '/usr/local/bin/snyk container monitor -d {} --org={} --tags=kubernetes=monitored '.format(modifiedImage, ORGID)
->>>>>>> Stashed changes
         os.system(cmd)
 
 
@@ -69,7 +59,7 @@ def deleteNonRunningTargets():
         containerResponseJSON = containerResponse.json()
         fullListofContainers = list(containerResponseJSON['data'])
         containerResponse.raise_for_status()
-        while(containerResponseJSON.get('data') != None):
+        while(containerResponseJSON.get('data') != None and 'Next' in containerResponseJSON['links']):
             containerResponse = reqs.get("https://api.snyk.io/{}&version={}".format(containerResponseJSON['links']['next'], SNYKAPIVERSION))
             containerResponseJSON = containerResponse.json()
             if containerResponseJSON.get('Data') != None:
@@ -114,6 +104,9 @@ def deleteNonRunningTargets():
         print("If this error looks abnormal please check https://status.snyk.io/ for any incidents")
         raise ex        
 
+
+    replaceFunc = lambda x: x.replace(":", "_")
+    allRunningPods_ = list(map(replaceFunc, allRunningPods))
    #There is a lot changing here, because of that there is (will be) a ton of commented out logic as I try to enable this to work with the nextPageKey logic
    #for containerImage in containerResponseJSON['data']:
     for containerImage in fullListofContainers:
@@ -126,9 +119,6 @@ def deleteNonRunningTargets():
 
         #image that is not running on the cluster
         for imageName in containerImage['attributes']['names']:
-<<<<<<< Updated upstream
-            if imageName not in allRunningPods:
-=======
 
             imageTagStripped = imageName.split(':')
             imageTagStripped = imageTagStripped[0]
@@ -137,7 +127,6 @@ def deleteNonRunningTargets():
 
 
             if imageName not in allRunningPods and imageName_ not in allRunningPods_ and "@" not in imageName:
->>>>>>> Stashed changes
 
                 #TODO: change the split to replace for '_', depending on the workflow it may make more sense to create targets with <image>_<version>
                 #This really doesnt do much since it doesnt break it up in the UI. Long term itll be better to 'docker tag _' instead
@@ -174,22 +163,20 @@ for pod in v1.list_pod_for_all_namespaces().items:
     #print(pod.status.container_statuses[0].image)
     
     #TODO: change logic to use this, we can check the image and the ID. This works if no tag is defined.
+    multiContainerPod = pod.status.container_statuses
     containerID = pod.status.container_statuses[0].image
+
     for container in pod.spec.containers: 
-        image= container.image
+        image = container.image
 
-<<<<<<< Updated upstream
-
-        ##TODO: if you dont set a tag in k8s, it looks like the image comes back like 'doll1av/frontend', Snyk automatically adds the SHA which I think it gets from the 
-        #containerID, using this as a workaround (possibly forever but idk)
-=======
         
         ##TODO: if the image we got is the image SHA, which contains @ instead of :, we wnat to cycle through our object (only multi container pod) to get the imageID
         #Which will be in the expected format. This happens when you deploy an image without a tag EG: doll1av/frontend instead of doll1av/frontend:latest
         #This also helps later where when using containerd you need the Fully qualified image name to actually tag images EG: docker.io/doll1av/frontend:latest
->>>>>>> Stashed changes
         if ':' not in image:
-            image = containerID
+            for imagesInContainer in multiContainerPod:
+                if image in imagesInContainer.image:
+                    image = imagesInContainer.image
 
         allRunningPods.append(image)
         
@@ -224,10 +211,6 @@ else:
 
 #If it seems like data isnt present when it should be, from Snyk, then consider adding a sleep here to compensate.
 deleteNonRunningTargets()
-<<<<<<< Updated upstream
 
-#clean exit so our K8s 
-=======
 #clean exit so our K8s job doesnt error out
->>>>>>> Stashed changes
 sys.exit()
