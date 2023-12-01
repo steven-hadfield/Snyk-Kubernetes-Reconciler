@@ -4,11 +4,16 @@ import json
 import os
 import time 
 import sys
+<<<<<<< Updated upstream
+=======
+#import time
+>>>>>>> Stashed changes
 
 #Globals, probably worth adding in some sort of direct failure here if these are not set
 APIKEY = os.getenv("APIKEY")
 ORGID = os.getenv("ORGID")
 SNYKAPIVERSION = os.getenv("SNYKAPIVERSION")
+SNYKDEBUG = os.getenv("SNYKDEBUG")
 
 #Scan any missing images, 'images' should be a iterable list
 #We can modify the arguments of Snyk Container to include tags which can then be used to create project views or import metadata from the pods if needed
@@ -22,10 +27,36 @@ def scanMissingImages(images):
     
     for missingImage in images:
 
+<<<<<<< Updated upstream
         #projectName = missingImage.replace(":", "_")
         #cmd = '/usr/app/sec/snyk container monitor {} --org={} --tags=kubernetes=monitored'.format(missingImage, orgId)
         print("Scanning {}".format(missingImage))
         cmd = '/usr/local/bin/snyk container monitor {} --org={} --tags=kubernetes=monitored '.format(missingImage, ORGID)
+=======
+        #tag = missingImage.split(":")
+        #tag = tag[1]
+        #modifiedImage = missingImage.replace(':', '_')
+        
+        #change out depending on what socket we can mount on the host
+        #print("Re-tagging {} to {}".format(missingImage, modifiedImage))
+        #cmd = 'docker tag {} {}'.format(missingImage, modifiedImage)
+        #cmd = 'ctr images pull {}'.format(missingImage)
+        #os.system(cmd)
+
+
+        #cmd = 'ctr --namespace=k8s.io images tag {} {}'.format(missingImage, modifiedImage)
+        #cmd = 'ctr images tag {} {}:{}'.format(missingImage, modifiedImage, tag)
+        #os.system(cmd)
+        #projectName = missingImage.replace(":", "_")
+        print("Scanning {}".format(missingImage))
+
+        if bool(SNYKDEBUG) == True:
+            cmd = '/usr/local/bin/snyk container monitor {} -d --org={} --tags=kubernetes=monitored'.format(missingImage, ORGID)
+        else:
+            cmd = '/usr/local/bin/snyk container monitor {} --org={} --tags=kubernetes=monitored'.format(missingImage, ORGID)
+
+        #cmd = '/usr/local/bin/snyk container monitor -d {} --org={} --tags=kubernetes=monitored '.format(modifiedImage, ORGID)
+>>>>>>> Stashed changes
         os.system(cmd)
 
 
@@ -56,6 +87,10 @@ def deleteNonRunningTargets():
         raise ex
 
 
+
+
+
+
     #My cluster is small, the logic for this appears to be different from the above so idk if the while loop check works :(
     try:
         allTargetsUrl = "https://api.snyk.io/rest/orgs/{}/targets?version={}".format(ORGID, SNYKAPIVERSION)
@@ -83,9 +118,26 @@ def deleteNonRunningTargets():
    #for containerImage in containerResponseJSON['data']:
     for containerImage in fullListofContainers:
 
+        #Snyk keeps deleted images around for 8 days, there shouldn't be target refs for images that have been deleted
+        #We need to skip these due to how Snyk displays targets in the UI, if apiServer:1.27.2 is around after being deleted
+        # and we are monitoring apiServer 1.27.3 actively the below checks will delete apiServer 1.27.3 as the target for both is 'registry/apiServer'
+        if containerImage['relationships']['image_target_refs']['links'].get('self') == None:
+            continue
+
         #image that is not running on the cluster
         for imageName in containerImage['attributes']['names']:
+<<<<<<< Updated upstream
             if imageName not in allRunningPods:
+=======
+
+            imageTagStripped = imageName.split(':')
+            imageTagStripped = imageTagStripped[0]
+
+            imageName_ = imageTagStripped[0] + '_' + imageTagStripped[1]
+
+
+            if imageName not in allRunningPods and imageName_ not in allRunningPods_ and "@" not in imageName:
+>>>>>>> Stashed changes
 
                 #TODO: change the split to replace for '_', depending on the workflow it may make more sense to create targets with <image>_<version>
                 #This really doesnt do much since it doesnt break it up in the UI. Long term itll be better to 'docker tag _' instead
@@ -99,7 +151,7 @@ def deleteNonRunningTargets():
                         deleteTargetURL = "https://api.snyk.io/rest/orgs/{}/targets/{}?version={}".format(ORGID,target['id'], SNYKAPIVERSION)
                         deleteResp = reqs.delete(deleteTargetURL, headers={'Authorization': '{}'.format(APIKEY)})
                         if deleteResp.status_code == 204:
-                            print("succesfully delete targetID {}, based off image {}".format(target['id'], imageTagStripped))
+                            print("succesfully deleted targetID {}, based off image {}".format(target['id'], imageTagStripped))
                         else:
                             print("Some issue deleting targetID {}, based off image {}. Response code: {}".format(target['id'], imageTagStripped, deleteResp.status_code))
 
@@ -118,7 +170,6 @@ v1 = client.CoreV1Api()
 allRunningPods = []
 needsToBeScanned = []
 
-
 for pod in v1.list_pod_for_all_namespaces().items:
     #print(pod.status.container_statuses[0].image)
     
@@ -127,9 +178,16 @@ for pod in v1.list_pod_for_all_namespaces().items:
     for container in pod.spec.containers: 
         image= container.image
 
+<<<<<<< Updated upstream
 
         ##TODO: if you dont set a tag in k8s, it looks like the image comes back like 'doll1av/frontend', Snyk automatically adds the SHA which I think it gets from the 
         #containerID, using this as a workaround (possibly forever but idk)
+=======
+        
+        ##TODO: if the image we got is the image SHA, which contains @ instead of :, we wnat to cycle through our object (only multi container pod) to get the imageID
+        #Which will be in the expected format. This happens when you deploy an image without a tag EG: doll1av/frontend instead of doll1av/frontend:latest
+        #This also helps later where when using containerd you need the Fully qualified image name to actually tag images EG: docker.io/doll1av/frontend:latest
+>>>>>>> Stashed changes
         if ':' not in image:
             image = containerID
 
@@ -166,6 +224,10 @@ else:
 
 #If it seems like data isnt present when it should be, from Snyk, then consider adding a sleep here to compensate.
 deleteNonRunningTargets()
+<<<<<<< Updated upstream
 
 #clean exit so our K8s 
+=======
+#clean exit so our K8s job doesnt error out
+>>>>>>> Stashed changes
 sys.exit()
