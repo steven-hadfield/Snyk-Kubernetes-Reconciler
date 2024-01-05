@@ -8,7 +8,7 @@ spec:
     spec:
       serviceAccountName: snyk-reconciler
       containers:
-      - image: a1doll/k8sreconciler:latest
+      - image: a1doll/k8sreconciler:beta
         name: snyk-reconciler
         resources: {}
         imagePullPolicy: Always
