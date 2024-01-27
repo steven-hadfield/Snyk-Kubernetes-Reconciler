@@ -1,17 +1,27 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  creationTimestamp: null
   name: snyk-reconciler
 spec:
   template:
     spec:
       serviceAccountName: snyk-reconciler
+      volumes:
+      - name: snyk-cred-test
+        configMap:
+          name: snyk-cred-test
       containers:
-      - image: a1doll/k8sreconciler:beta
+      - image: a1doll/k8sreconciler:test
         name: snyk-reconciler
         resources: {}
         imagePullPolicy: Always
+        volumeMounts:
+        - mountPath: /tmp/.docker
+          name: snyk-cred-test
+        securityContext:
+          privileged: False
+          capabilities:
+            add: ["NET_ADMIN","SYS_ADMIN"]
         env:
         - name: APIKEY
           valueFrom:
@@ -26,15 +36,5 @@ spec:
         - name: SNYKAPIVERSION
           value: "2023-11-06~beta"
         - name:  SNYKDEBUG
-          value: "True"
-        - name: DOCKERUSER
-          valueFrom:
-            secretKeyRef:
-              name: snyk-creds
-              key: DOCKERUSERNAME
-        - name: DOCKERPASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: snyk-creds
-              key: DOCKERPASSWORD
+          value: "False"
       restartPolicy: Never
