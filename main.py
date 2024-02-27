@@ -40,79 +40,64 @@ def scanMissingImages(images):
 def deleteNonRunningTargets():
 
     #May be worth building in a retry mechanism instead of just failing
+    fullListofContainers = []
     try:
-        containerImageURL = "https://api.snyk.io/rest/orgs/{}/container_images?version={}&limit=100".format(ORGID, SNYKAPIVERSION)
-        containerResponse = reqs.get(containerImageURL, headers={'Authorization': '{}'.format(APIKEY)})
-        containerResponseJSON = containerResponse.json()
-        fullListofContainers = list(containerResponseJSON['data'])
-        containerResponse.raise_for_status()
-        while(containerResponseJSON.get('data') != None and 'next' in containerResponseJSON['links']):
-            containerResponse = reqs.get("https://api.snyk.io/{}&version={}&limit=100".format(containerResponseJSON['links']['next'], SNYKAPIVERSION))
+        containerImageUrl = "https://api.snyk.io/rest/orgs/{}/container_images?version={}&limit=100".format(ORGID, SNYKAPIVERSION)
+        while True:
+            containerResponse = reqs.get(containerImageUrl, headers={'Authorization': APIKEY})
+            containerResponse.raise_for_status()
             containerResponseJSON = containerResponse.json()
-            if containerResponseJSON.get('Data') != None:
-                fullListofContainers.append(containerResponseJSON['data'])
-
-
+            fullListofContainers.extend(containerResponseJSON['data'])
+            nextPageUrl = containerResponseJSON['links'].get('next')
+            if not nextPageUrl:
+                break
+            containerImageUrl = "https://api.snyk.io/{}&version={}&limit=100".format(nextPageUrl, SNYKAPIVERSION)
     except reqs.HTTPError as ex:
-        print("ERROR: some error occured dumping target JSON {}".format(containerResponseJSON))
+        print("ERROR: HTTP error occurred while fetching container images:", ex)
         print("If this error looks abnormal please check https://status.snyk.io/ for any incidents")
-        raise ex
     except reqs.Timeout:
         print("ERROR: Request to the container_images endpoint timed out, returning without completing")
         print("If this error looks abnormal please check https://status.snyk.io/ for any incidents")
 
-        raise ex
 
-
+    fullListOfProjects = []
     try:
-        allProjectsUrl = "https://api.snyk.io/rest/orgs/{}/projects?version={}&limit=100".format(ORGID, SNYKAPIVERSION)
-        projectResponse = reqs.get(allProjectsUrl, headers={'Authorization': '{}'.format(APIKEY)})
-        projectResponseJSON = projectResponse.json()
-        projectResponse.raise_for_status()
-        fullListOfProjects = list(projectResponseJSON['data'])
-
-        while(projectResponseJSON.get('data') != None and 'next' in projectResponseJSON['links'] ):
-            projectResponse = reqs.get("https://api.snyk.io/{}&version={}&limit=100".format(projectResponseJSON['links']['next'], SNYKAPIVERSION))
+        allProjectsURL = "https://api.snyk.io/rest/orgs/{}/projects?version={}&limit=100".format(ORGID, SNYKAPIVERSION)
+        while True:
+            projectResponse = reqs.get(allProjectsURL, headers={'Authorization': APIKEY})
+            projectResponse.raise_for_status()
             projectResponseJSON = projectResponse.json()
-            if projectResponseJSON.get('Data') != None:
-                fullListOfProjects.append(projectResponseJSON['data'])
-
+            fullListOfProjects.extend(projectResponseJSON['data'])
+            nextPageProjectURL = projectResponseJSON['links'].get('next')
+            if not nextPageProjectURL:
+                break
+            allProjectsURL = "https://api.snyk.io/{}&version={}&limit=100".format(nextPageProjectURL, SNYKAPIVERSION)
     except reqs.HTTPError as ex:
-        print("ERROR: some error occured dumping target JSON {}".format(targetResponseJSON))
+        print("ERROR: HTTP error occurred while fetching projects:", ex)
         print("If this error looks abnormal please check https://status.snyk.io/ for any incidents")
         raise ex
     except reqs.Timeout:
-        print("ERROR: Request to the Targets endpoint timed out, returning without completing")
+        print("ERROR: Request to the projects endpoint timed out, returning without completing")
         print("If this error looks abnormal please check https://status.snyk.io/ for any incidents")
-        raise ex       
+        raise ex    
 
-
-
-    #There is a lot changing here, because of that there is (will be) a ton of commented out logic as I try to enable this to work with the nextPageKey logic
-    #for containerImage in containerResponseJSON['data']:
     for containerImage in fullListofContainers:
 
         #Snyk keeps deleted images around for 8 days, there shouldn't be target refs for images that have been deleted
         #We need to skip these due to how Snyk displays targets in the UI, if apiServer:1.27.2 is around after being deleted
         # and we are monitoring apiServer 1.27.3 actively the below checks will delete apiServer 1.27.3 as the target for both is 'registry/apiServer'
-        if containerImage['relationships']['image_target_refs']['links'].get('self') == None:
+        if containerImage['relationships']['image_target_refs']['links'].get('self') is None:
             continue
 
-        #image that is not running on the cluster
         for imageName in containerImage['attributes']['names']:
 
-            imageTagStripped = imageName.split(':')
-            imageTagStripped = imageTagStripped[0]
-
-
-            if imageName not in allRunningPods:
-                #TODO: change the split to replace for '_', depending on the workflow it may make more sense to create targets with <image>_<version>
-                #This really doesnt do much since it doesnt break it up in the UI. Long term itll be better to 'docker tag _' instead
-                #If thats not the way we do it, possibly removing all this and deleting on the project level (and target if the target has no projects associated with it)
-                #but that would require more logic and API calls. Mounting the docker socket might just be easier ¯\_(ツ)_/¯ 
-                imageTagStripped = imageName.split(':')
-                imageTagStripped = imageTagStripped[0]
-                deletedTargetIDs= []            
+            #No SHA support as of now
+            if '@' in imageName:
+                continue
+            
+            if imageName not in allRunningPods and not any(imageName in subString for subString in allRunningPods):
+                imageTagStripped = imageName.split(':')[0]
+                deletedTargetIDs= []         
                 for project in fullListOfProjects:
                     if project['relationships']['target']['data']['id'] in deletedTargetIDs:
                         continue
@@ -144,8 +129,7 @@ allRunningPods = []
 needsToBeScanned = []
 
 for pod in v1.list_pod_for_all_namespaces().items:
-    
-    #TODO: change logic to use this, we can check the image and the ID. This works if no tag is defined.
+
     multiContainerPod = pod.status.container_statuses
 
     for container in pod.spec.containers: 
@@ -154,9 +138,6 @@ for pod in v1.list_pod_for_all_namespaces().items:
         if 'a1doll/k8sreconciler' in image:
             continue
         
-        ##TODO: if the image we got is the image SHA, which contains @ instead of :, we wnat to cycle through our object (only multi container pod) to get the imageID
-        #Which will be in the expected format. This happens when you deploy an image without a tag EG: doll1av/frontend instead of doll1av/frontend:latest
-        #This also helps later where when using containerd you need the Fully qualified image name to actually tag images EG: docker.io/doll1av/frontend:latest
         if ':' not in image:
             for imagesInContainer in multiContainerPod:
                 if image in imagesInContainer.image:
@@ -180,19 +161,13 @@ for pod in v1.list_pod_for_all_namespaces().items:
         
         #These are running on the API server but do not exist in Snyk
         #The None only works if the image has NEVER been scanned, after it has been scanned it we keep some data around
-        if responseJSON.get('data') == None:
+        if not responseJSON.get('data'):
             print("{} does not exist in Snyk, adding it to the queue to be scanned".format(image))
             needsToBeScanned.append(image)
-            continue
-
-        #In some cases we have the same image with multiple different SHAs, because of this we need to check each occurance in the response
-        imageExists = False
-        for target in responseJSON['data']:
-            if 'self' in target['relationships']['image_target_refs']['links']:
-                imageExists =  True
-                
-        if imageExists == False:
-            print("{} does not exist in Snyk, adding it to the queue to be scanned".format(image))
+        else:
+            imageExists = any('self' in target['relationships']['image_target_refs']['links'] for target in responseJSON['data'])
+        if not imageExists:
+            print("{} does not exist in Snyk, adding it to the queue to be scanned".format(image))            
             needsToBeScanned.append(image)
 
 
