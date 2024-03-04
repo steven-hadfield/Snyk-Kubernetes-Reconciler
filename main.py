@@ -3,7 +3,6 @@ from kubernetes import client, config
 import os
 import sys
 
-#Globals, probably worth adding in some sort of direct failure here if these are not set
 APIKEY = os.getenv("APIKEY")
 ORGID = os.getenv("ORGID")
 SNYKAPIVERSION = os.getenv("SNYKAPIVERSION")
@@ -14,13 +13,10 @@ DOCKERUSER = os.getenv("DOCKERUSER")
 APIKEY = "Token " + APIKEY
 
 
-#Scan any missing images, 'images' should be a iterable list
-#We can modify the arguments of Snyk Container to include tags which can then be used to create project views or import metadata from the pods if needed
-#Tags seem like an easy way to say 'this is monitored on your cluster / through this script'
-def scanMissingImages(images):
-    splitKey = APIKEY.split()
 
-    #Auth the CLI
+def scanMissingImages(images):
+
+    splitKey = APIKEY.split()
     cmd = '/usr/local/bin/snyk auth {}'.format(splitKey[1])
     os.system(cmd)
     
@@ -71,7 +67,7 @@ def deleteNonRunningTargets():
             nextPageProjectURL = projectResponseJSON['links'].get('next')
             if not nextPageProjectURL:
                 break
-            allProjectsURL = "https://api.snyk.io/{}&version={}&limit=100".format(nextPageProjectURL, SNYKAPIVERSION)
+            allProjectsURL = "https://api.snyk.io{}".format(nextPageProjectURL)
     except reqs.HTTPError as ex:
         print("ERROR: HTTP error occurred while fetching projects:", ex)
         print("If this error looks abnormal please check https://status.snyk.io/ for any incidents")
@@ -83,21 +79,17 @@ def deleteNonRunningTargets():
 
     for containerImage in fullListofContainers:
 
-        #Snyk keeps deleted images around for 8 days, there shouldn't be target refs for images that have been deleted
-        #We need to skip these due to how Snyk displays targets in the UI, if apiServer:1.27.2 is around after being deleted
-        # and we are monitoring apiServer 1.27.3 actively the below checks will delete apiServer 1.27.3 as the target for both is 'registry/apiServer'
-        if containerImage['relationships']['image_target_refs']['links'].get('self') is None:
+        if containerImage['relationships']['image_target_refs']['links'].get('self') is None or containerImage['attributes'].get('names') is None:
             continue
 
         for imageName in containerImage['attributes']['names']:
-
-            #No SHA support as of now
-            if '@' in imageName:
-                continue
-            
-            if imageName not in allRunningPods and not any(imageName in subString for subString in allRunningPods):
+            if ':' in imageName:
                 imageTagStripped = imageName.split(':')[0]
-                deletedTargetIDs= []         
+            else:
+                imageTagStripped = imageName.split('@')[0]
+            
+            if imageName not in allRunningPods and not any(imageTagStripped in subString for subString in allRunningPods):
+                deletedTargetIDs= []
                 for project in fullListOfProjects:
                     if project['relationships']['target']['data']['id'] in deletedTargetIDs:
                         continue
@@ -159,8 +151,7 @@ for pod in v1.list_pod_for_all_namespaces().items:
         except reqs.Timeout:
             print("ERROR: Request to the container_images endpoint timed out for image {}".format(image))
         
-        #These are running on the API server but do not exist in Snyk
-        #The None only works if the image has NEVER been scanned, after it has been scanned it we keep some data around
+        imageExists = True
         if not responseJSON.get('data'):
             print("{} does not exist in Snyk, adding it to the queue to be scanned".format(image))
             needsToBeScanned.append(image)
