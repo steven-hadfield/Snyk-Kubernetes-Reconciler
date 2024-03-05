@@ -2,6 +2,7 @@ import requests as reqs
 from kubernetes import client, config
 import os
 import sys
+from time import sleep
 
 APIKEY = os.getenv("APIKEY")
 ORGID = os.getenv("ORGID")
@@ -41,10 +42,15 @@ def deleteNonRunningTargets():
         containerImageUrl = "https://api.snyk.io/rest/orgs/{}/container_images?version={}&limit=100".format(ORGID, SNYKAPIVERSION)
         while True:
             containerResponse = reqs.get(containerImageUrl, headers={'Authorization': APIKEY})
+            if containerResponse.status_code == 429:
+                print("Rate limit status code recieved, sleeping for a minute...")
+                sleep(60)
+                continue
             containerResponse.raise_for_status()
             containerResponseJSON = containerResponse.json()
             fullListofContainers.extend(containerResponseJSON['data'])
             nextPageUrl = containerResponseJSON['links'].get('next')
+
             if not nextPageUrl:
                 break
             containerImageUrl = "https://api.snyk.io/{}&version={}&limit=100".format(nextPageUrl, SNYKAPIVERSION)
@@ -61,6 +67,10 @@ def deleteNonRunningTargets():
         allProjectsURL = "https://api.snyk.io/rest/orgs/{}/projects?version={}&limit=100".format(ORGID, SNYKAPIVERSION)
         while True:
             projectResponse = reqs.get(allProjectsURL, headers={'Authorization': APIKEY})
+            if projectResponse.status_code == 429:
+                print("Rate limit status code recieved, sleeping for a minute...")
+                sleep(60)
+                continue
             projectResponse.raise_for_status()
             projectResponseJSON = projectResponse.json()
             fullListOfProjects.extend(projectResponseJSON['data'])
@@ -68,6 +78,8 @@ def deleteNonRunningTargets():
             if not nextPageProjectURL:
                 break
             allProjectsURL = "https://api.snyk.io{}".format(nextPageProjectURL)
+
+            
     except reqs.HTTPError as ex:
         print("ERROR: HTTP error occurred while fetching projects:", ex)
         print("If this error looks abnormal please check https://status.snyk.io/ for any incidents")
@@ -143,6 +155,10 @@ for pod in v1.list_pod_for_all_namespaces().items:
         try:
             print("Sending request to the container images endpoint for {}".format(image))
             response = reqs.get(URL, headers={'Authorization': '{}'.format(APIKEY)})
+            if response.status_code == 429:
+                print("Rate limit status code recieved, sleeping for a minute...")
+                sleep(60)
+                continue
             responseJSON = response.json()
         except reqs.HTTPError as ex:
             print("ERROR: Some error has occured, dumping response JSON: {}".format(responseJSON))
@@ -160,6 +176,7 @@ for pod in v1.list_pod_for_all_namespaces().items:
         if not imageExists:
             print("{} does not exist in Snyk, adding it to the queue to be scanned".format(image))            
             needsToBeScanned.append(image)
+
 
 
 #Do the work we have set out to do
