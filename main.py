@@ -46,10 +46,6 @@ def deleteNonRunningTargets():
         containerImageUrl = "https://api.snyk.io/rest/orgs/{}/container_images?version={}&limit=100".format(ORGID, SNYKAPIVERSION)
         while True:
             containerResponse = session.get(containerImageUrl, headers={'Authorization': APIKEY})
-            if containerResponse.status_code == 429:
-                print("Rate limit status code recieved, sleeping for a minute...")
-                sleep(60)
-                continue
             containerResponse.raise_for_status()
             containerResponseJSON = containerResponse.json()
             fullListofContainers.extend(containerResponseJSON['data'])
@@ -165,8 +161,8 @@ for pod in v1.list_pod_for_all_namespaces().items:
         try:
             print("Sending request to the container images endpoint for {}".format(image))
             response = session.get(URL, headers={'Authorization': APIKEY})
-
             responseJSON = response.json()
+
         except reqs.HTTPError as ex:
             print("ERROR: Some error has occured, dumping response JSON: {}".format(responseJSON))
             print("If this error looks abnormal please check https://status.snyk.io/ for any incidents")
