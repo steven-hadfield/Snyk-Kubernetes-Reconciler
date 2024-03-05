@@ -3,6 +3,9 @@ from kubernetes import client, config
 import os
 import sys
 from time import sleep
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
+
 
 APIKEY = os.getenv("APIKEY")
 ORGID = os.getenv("ORGID")
@@ -36,12 +39,13 @@ def scanMissingImages(images):
 
 def deleteNonRunningTargets():
 
-    #May be worth building in a retry mechanism instead of just failing
+
+
     fullListofContainers = []
     try:
         containerImageUrl = "https://api.snyk.io/rest/orgs/{}/container_images?version={}&limit=100".format(ORGID, SNYKAPIVERSION)
         while True:
-            containerResponse = reqs.get(containerImageUrl, headers={'Authorization': APIKEY})
+            containerResponse = session.get(containerImageUrl, headers={'Authorization': APIKEY})
             if containerResponse.status_code == 429:
                 print("Rate limit status code recieved, sleeping for a minute...")
                 sleep(60)
@@ -66,11 +70,7 @@ def deleteNonRunningTargets():
     try:
         allProjectsURL = "https://api.snyk.io/rest/orgs/{}/projects?version={}&limit=100".format(ORGID, SNYKAPIVERSION)
         while True:
-            projectResponse = reqs.get(allProjectsURL, headers={'Authorization': APIKEY})
-            if projectResponse.status_code == 429:
-                print("Rate limit status code recieved, sleeping for a minute...")
-                sleep(60)
-                continue
+            projectResponse = session.get(allProjectsURL, headers={'Authorization': APIKEY})
             projectResponse.raise_for_status()
             projectResponseJSON = projectResponse.json()
             fullListOfProjects.extend(projectResponseJSON['data'])
@@ -132,6 +132,17 @@ v1 = client.CoreV1Api()
 allRunningPods = []
 needsToBeScanned = []
 
+#Retry logic
+retry_strategy = Retry(
+    total=5,  # Maximum number of retries
+    status_forcelist=[429, 500, 502, 503, 504],  # HTTP status codes to retry on
+    backoff_factor=15
+    )
+adapter = HTTPAdapter(max_retries=retry_strategy)
+session = reqs.Session()
+session.mount('http://', adapter)
+session.mount('https://', adapter)
+
 for pod in v1.list_pod_for_all_namespaces().items:
 
     multiContainerPod = pod.status.container_statuses
@@ -149,16 +160,12 @@ for pod in v1.list_pod_for_all_namespaces().items:
 
         allRunningPods.append(image)
         
-        #will need to add some retry logic incase the connection dies
         URL = "https://api.snyk.io/rest/orgs/{}/container_images?names={}&version={}".format(ORGID, image, SNYKAPIVERSION)
         
         try:
             print("Sending request to the container images endpoint for {}".format(image))
-            response = reqs.get(URL, headers={'Authorization': '{}'.format(APIKEY)})
-            if response.status_code == 429:
-                print("Rate limit status code recieved, sleeping for a minute...")
-                sleep(60)
-                continue
+            response = session.get(URL, headers={'Authorization': APIKEY})
+
             responseJSON = response.json()
         except reqs.HTTPError as ex:
             print("ERROR: Some error has occured, dumping response JSON: {}".format(responseJSON))
@@ -186,4 +193,5 @@ else:
     print("All images on the cluster are accounted for, skipping scanning function")
 
 deleteNonRunningTargets()
+session.close()
 sys.exit()
