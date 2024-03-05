@@ -7,7 +7,7 @@ cffi==1.16.0
 charset-normalizer==3.3.1
 click==8.1.7
 colorama==0.4.6
-cryptography==41.0.5
+cryptography==42.0.4
 decorator==5.1.1
 Deprecated==1.2.14
 deprecation==2.1.0
@@ -27,6 +27,7 @@ markdown-it-py==3.0.0
 mashumaro==3.10
 mdurl==0.1.2
 oauthlib==3.2.2
+pacakge==0.0
 packaging==23.2
 platformdirs==4.2.0
 py==1.11.0
@@ -50,7 +51,7 @@ rsa==4.9
 shellingham==1.5.4
 six==1.16.0
 sniffio==1.3.0
-snyk-tags @ git+https://github.com/snyk-labs/snyk-tags-tool.git@c1dddcb408398e00debbe1ace9cfe32a7ddcdc62
+snyk-tags @ git+https://github.com/snyk-labs/snyk-tags-tool.git@17ea5a2e39976d80bdc5bdf464cdaf5a15f249d9
 typer==0.9.0
 typing_extensions==4.8.0
 urllib3==1.26.18
