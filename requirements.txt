@@ -11,7 +11,9 @@ cryptography==41.0.5
 decorator==5.1.1
 Deprecated==1.2.14
 deprecation==2.1.0
+distlib==0.3.8
 docker==7.0.0
+filelock==3.13.1
 google-auth==2.23.4
 h11==0.14.0
 httpcore==0.17.3
@@ -26,6 +28,7 @@ mashumaro==3.10
 mdurl==0.1.2
 oauthlib==3.2.2
 packaging==23.2
+platformdirs==4.2.0
 py==1.11.0
 pyasn1==0.5.0
 pyasn1-modules==0.3.0
@@ -51,6 +54,7 @@ snyk-tags @ git+https://github.com/snyk-labs/snyk-tags-tool.git@c1dddcb408398e00
 typer==0.9.0
 typing_extensions==4.8.0
 urllib3==1.26.18
+virtualenv==20.25.1
 websocket-client==1.6.4
 wrapt==1.15.0
 zipp==3.17.0
