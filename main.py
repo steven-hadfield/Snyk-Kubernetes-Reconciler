@@ -2,11 +2,10 @@ import requests as reqs
 from kubernetes import client, config
 import os
 import sys
-from time import sleep
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
-
-
+import subprocess
+import re
 APIKEY = os.getenv("APIKEY")
 ORGID = os.getenv("ORGID")
 SNYKAPIVERSION = os.getenv("SNYKAPIVERSION")
@@ -20,8 +19,13 @@ APIKEY = "Token " + APIKEY
 
 def scanMissingImages(images):
 
+
+    getSnykPath =  subprocess.Popen("which snyk", shell=True, stdout=subprocess.PIPE).stdout
+    snykPath =  str(getSnykPath.read())
+    snykPath = re.findall('\/.*snyk',snykPath)[0]
+
     splitKey = APIKEY.split()
-    cmd = '/usr/local/bin/snyk auth {}'.format(splitKey[1])
+    cmd = '{} auth {}'.format(snykPath, splitKey[1])
     os.system(cmd)
     
     for missingImage in images:
@@ -30,9 +34,9 @@ def scanMissingImages(images):
         print("Scanning {}".format(missingImage))
 
         if bool(SNYKDEBUG) == True:
-            cmd = '/usr/local/bin/snyk container monitor {} -d --org={} --username={} --password={} --tags=kubernetes=monitored'.format(missingImage, ORGID, DOCKERUSER, DOCKERPASSWORD)
+            cmd = '{} container monitor {} -d --org={} --username={} --password={} --tags=kubernetes=monitored'.format(snykPath,missingImage, ORGID, DOCKERUSER, DOCKERPASSWORD)
         else:
-            cmd = '/usr/local/bin/snyk container monitor {} --org={} --username={} --password={} --tags=kubernetes=monitored'.format(missingImage, ORGID, DOCKERUSER, DOCKERPASSWORD)
+            cmd = '{} container monitor {} --org={} --username={} --password={} --tags=kubernetes=monitored'.format(snykPath,missingImage, ORGID, DOCKERUSER, DOCKERPASSWORD)
 
         os.system(cmd)
 
@@ -179,8 +183,6 @@ for pod in v1.list_pod_for_all_namespaces().items:
         if not imageExists:
             print("{} does not exist in Snyk, adding it to the queue to be scanned".format(image))            
             needsToBeScanned.append(image)
-
-
 
 #Do the work we have set out to do
 if len(needsToBeScanned) != 0:
