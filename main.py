@@ -8,7 +8,7 @@ import subprocess
 import re
 APIKEY = os.getenv("APIKEY")
 ORGID = os.getenv("ORGID")
-SNYKAPIVERSION = os.getenv("SNYKAPIVERSION")
+SNYKAPIVERSION = "2023-11-06~beta"
 SNYKDEBUG = os.getenv("SNYKDEBUG")
 DOCKERPASSWORD = os.getenv("DOCKERPASSWORD")
 DOCKERUSER = os.getenv("DOCKERUSER")
