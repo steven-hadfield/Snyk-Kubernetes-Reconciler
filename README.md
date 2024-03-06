@@ -12,4 +12,4 @@ Currently this project runs as a python script on a local machine (see ReadMe wi
 1. APITOKEN environment variable set with the relevant API token from the Snyk tennant.
 2. ORGID environment variable set with the relevant organization ID from the Snyk tennant.
 3. A local Docker client running, that has access to the private repositories that your pods are running images from.
-4. The Snyk CLI available at /usr/local/bin. This can be modified within the script if needed.
+4. The Snyk CLI is available on the machine, pathing is based on the command 'which snyk'
