@@ -5,6 +5,7 @@ Stop-gap visibility while V3 of the enterprise monitor is not GA
 
 1. This will work with Dockerfiles
 2.  If you are looking to do cadenced runs you can easily convert this to a cronjob (https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/)
+3.  This portion of the project is a WIP, running docker in docker requires elevated permissions at the moment so it is suggested to run this script locally instead of in a container
 
 # How to Deploy
 
