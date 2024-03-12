@@ -4,12 +4,12 @@ import os
 import sys
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
-import subprocess
-import re
+import shutil
+from subprocess import call
 APIKEY = os.getenv("APIKEY")
 ORGID = os.getenv("ORGID")
 SNYKAPIVERSION = "2023-11-06~beta"
-SNYKDEBUG = os.getenv("SNYKDEBUG")
+SNYKDEBUG = bool(os.getenv("SNYKDEBUG"))
 DOCKERPASSWORD = os.getenv("DOCKERPASSWORD")
 DOCKERUSER = os.getenv("DOCKERUSER")
 
@@ -19,26 +19,24 @@ APIKEY = "Token " + APIKEY
 
 def scanMissingImages(images):
 
-
-    getSnykPath =  subprocess.Popen("which snyk", shell=True, stdout=subprocess.PIPE).stdout
-    snykPath =  str(getSnykPath.read())
-    snykPath = re.findall('\/.*snyk',snykPath)[0]
+    snykPath = shutil.which("snyk")
 
     splitKey = APIKEY.split()
-    cmd = '{} auth {}'.format(snykPath, splitKey[1])
-    os.system(cmd)
-    
+    cmd = [snykPath, 'auth', splitKey[1]]
+    call(cmd)
+
     for missingImage in images:
+        print(f"Scanning {missingImage}")
 
+        cmd = [snykPath, 'container', 'monitor', missingImage, f'--org={ORGID}', '--tags=kubernetes=monitored']
+        if DOCKERUSER:
+            cmd.append(f'--username={DOCKERUSER}')
+        if DOCKERPASSWORD:
+            cmd.append(f'--password={DOCKERPASSWORD}')
+        if SNYKDEBUG:
+            cmd.append('-d')
 
-        print("Scanning {}".format(missingImage))
-
-        if bool(SNYKDEBUG) == True:
-            cmd = '{} container monitor {} -d --org={} --username={} --password={} --tags=kubernetes=monitored'.format(snykPath,missingImage, ORGID, DOCKERUSER, DOCKERPASSWORD)
-        else:
-            cmd = '{} container monitor {} --org={} --username={} --password={} --tags=kubernetes=monitored'.format(snykPath,missingImage, ORGID, DOCKERUSER, DOCKERPASSWORD)
-
-        os.system(cmd)
+        call(cmd)
 
 
 def deleteNonRunningTargets():
